@@ -1,50 +1,50 @@
-const { createLogger, format, transports } = require('winston');
-const fs = require('fs');
-const { version } = require('../../package.json');
+const winston = require('winston');
+const path = require('path');
 
-const logDir = 'logs';
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir);
-}
-
-const logger = createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: format.combine(
-    format.timestamp(),
-    format.errors({ stack: true }),
-    format.json()
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
   ),
   defaultMeta: {
     service: 'price-comparison-api',
-    version,
-    environment: process.env.NODE_ENV || 'development'
+    version: require('../../package.json').version,
+    environment: process.env.NODE_ENV || ('production')
   },
   transports: [
-    new transports.File({
-      filename: `${logDir}/error.log`,
-      level: 'error',
-      handleExceptions: true,
-      handleRejections: true,
-      maxsize: 5242880,
-      maxFiles: 5
-    }),
-    new transports.File({
-      filename: `${logDir}/combined.log`,
-      handleExceptions: true,
-      handleRejections: true,
-      maxsize: 5242880,
-      maxFiles: 5
-    })
+    // Always log to console
+    new winston.transports.Console(),
+    // Log to files only in non-production or if /tmp is available
+    ...(process.env.NODE_ENV !== 'production'
+      ? [
+          new winston.transports.File({
+            filename: path.join('logs', 'error.log'),
+            level: 'error'
+          }),
+          new winston.transports.File({
+            filename: path.join('logs', 'combined.log')
+          })
+        ]
+      : [
+          new winston.transports.File({
+            filename: path.join('/tmp', 'error.log'),
+            level: 'error'
+          }),
+          new winston.transports.File({
+            filename: path.join('/tmp', 'combined.log')
+          })
+        ])
   ]
 });
 
+// Ensure logs directory exists only in non-production
 if (process.env.NODE_ENV !== 'production') {
-  logger.add(new transports.Console({
-    format: format.combine(
-      format.colorize(),
-      format.simple()
-    )
-  }));
+  const fs = require('fs');
+  const logDir = 'logs';
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
 }
 
 module.exports = logger;
