@@ -1,0 +1,33 @@
+/* Custom styles and animations */
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+.price-tag::before { 
+  content: attr(data-currency); 
+  margin-right: 4px; 
+  font-weight: 500;
+}
+
+.fade-in { 
+  animation: fadeIn 0.5s ease-in-out; 
+}
+
+@keyframes fadeIn { 
+  from { opacity: 0; transform: translateY(10px); } 
+  to { opacity: 1; transform: translateY(0); } 
+}
+
+.loader {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #4f46e5;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
