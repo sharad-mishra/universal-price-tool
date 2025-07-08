@@ -1,5 +1,4 @@
 const winston = require('winston');
-const path = require('path');
 
 const logger = winston.createLogger({
   level: 'info',
@@ -10,41 +9,31 @@ const logger = winston.createLogger({
   defaultMeta: {
     service: 'price-comparison-api',
     version: require('../../package.json').version,
-    environment: process.env.NODE_ENV || ('production')
+    environment: process.env.NODE_ENV || 'production'
   },
   transports: [
     // Always log to console
-    new winston.transports.Console(),
-    // Log to files only in non-production or if /tmp is available
-    ...(process.env.NODE_ENV !== 'production'
-      ? [
-          new winston.transports.File({
-            filename: path.join('logs', 'error.log'),
-            level: 'error'
-          }),
-          new winston.transports.File({
-            filename: path.join('logs', 'combined.log')
-          })
-        ]
-      : [
-          new winston.transports.File({
-            filename: path.join('/tmp', 'error.log'),
-            level: 'error'
-          }),
-          new winston.transports.File({
-            filename: path.join('/tmp', 'combined.log')
-          })
-        ])
+    new winston.transports.Console()
   ]
 });
 
-// Ensure logs directory exists only in non-production
-if (process.env.NODE_ENV !== 'production') {
+// Only add file transports in development
+if (process.env.NODE_ENV === 'development') {
   const fs = require('fs');
+  const path = require('path');
   const logDir = 'logs';
+  
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
+  
+  logger.add(new winston.transports.File({
+    filename: path.join(logDir, 'error.log'),
+    level: 'error'
+  }));
+  logger.add(new winston.transports.File({
+    filename: path.join(logDir, 'combined.log')
+  }));
 }
 
 module.exports = logger;
