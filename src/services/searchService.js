@@ -1,5 +1,6 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
+const { COUNTRY_MAPPINGS } = require('../utils/constants');
 
 class SearchService {
   constructor() {
@@ -32,12 +33,15 @@ class SearchService {
 
   async searchGoogleShopping(country, query, retries = 2) {
     try {
+      const countryCode = country.toUpperCase();
+      const languageCode = COUNTRY_MAPPINGS[countryCode]?.language || 'en';
+
       const params = {
         api_key: this.serpApiKey,
         engine: 'google_shopping',
         q: query,
-        gl: country.toUpperCase(),
-        hl: 'en',
+        gl: countryCode,
+        hl: languageCode,
         num: 100,
         safe: 'active',
         device: 'desktop'
@@ -47,41 +51,39 @@ class SearchService {
         params,
         timeout: 30000,
         headers: {
-          'User-Agent': 'Universal-Price-Comparison/1.0'
+          'User-Agent': 'UniversalPriceComparisonTool/1.0 (+http://your-app-url.com)'
         }
       });
 
-      logger.debug('Raw shopping_results from SerpAPI', { 
-        shopping_results: response.data.shopping_results?.slice(0, 5).map(item => ({
-          title: item.title,
-          price: item.price,
-          link: item.link,
-          source: item.source
-        }))
-      });
-
-      if (!response.data || !response.data.shopping_results) {
-        logger.warn('No shopping results found in SerpAPI response', { country, query });
-        return [];
+      if (response.data.error) {
+        throw new Error(`SerpAPI Error: ${response.data.error}`);
       }
 
-      const results = response.data.shopping_results
-        .filter(item => this.validateShoppingResult(item))
-        .map(item => ({
-          title: item.title,
-          link: item.link || null, // Allow null links for debugging
-          price: item.price,
-          source: item.source,
-          thumbnail: item.thumbnail,
-          rating: item.rating,
-          reviews: item.reviews,
-          delivery: item.delivery,
-          serpapi_product_id: item.product_id,
-          type: 'shopping'
-        }));
+      if (response.data.shopping_results) {
+        const results = response.data.shopping_results
+          .filter(this.validateShoppingResult)
+          .map(item => {
+            const productLink = item.product_link || item.offer_link || item.link || null;
 
-      logger.info(`Found ${results.length} shopping results`, { country, query });
-      return results;
+            return {
+              title: item.title,
+              link: productLink,
+              price: item.price,
+              currency: item.price_currency || null,
+              source: item.source,
+              thumbnail: item.thumbnail,
+              rating: item.rating,
+              reviews: item.reviews,
+              delivery: item.delivery,
+              serpapi_product_id: item.product_id,
+              type: 'shopping'
+            };
+          });
+
+        logger.info(`Found ${results.length} shopping results`, { country, query });
+        return results;
+      }
+      return [];
       
     } catch (error) {
       logger.error('Google Shopping search failed', {
@@ -109,10 +111,7 @@ class SearchService {
       logger.warn('Skipping result with missing price', { title: item.title });
       return false;
     }
-    // Log full item for debugging
-    logger.debug('Validating shopping result', { item });
-    // Temporarily allow missing links for debugging
-    return true;
+    return true; 
   }
 }
 
